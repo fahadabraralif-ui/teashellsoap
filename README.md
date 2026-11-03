@@ -14,9 +14,18 @@ npm run build && npm start
 
 ## Data
 
-All orders, settings and uploaded images live in `./data` (`db.json` + `uploads/`), or in `DATA_DIR` if set.
-Back this folder up. It needs a host with a persistent disk (VPS, cPanel Node app, Railway/Render with a volume).
-Vercel's filesystem is read-only/ephemeral, so it is not suitable without swapping `lib/db.ts` to a database.
+- **`MONGODB_URI` set** (Vercel): orders, settings and uploaded images are stored in MongoDB.
+- **Not set** (local / VPS): everything lives in `./data` (`db.json` + `uploads/`), or in `DATA_DIR`.
+
+## Deploy on Vercel
+
+1. Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/atlas). Add a database user, and under
+   *Network Access* allow `0.0.0.0/0` (Vercel has no fixed IP). Copy the connection string.
+2. On [vercel.com](https://vercel.com) → *Add New → Project* → import this GitHub repo.
+3. Before deploying, add Environment Variables:
+   - `MONGODB_URI` = the Atlas connection string (with your password filled in)
+   - `ADMIN_PASSWORD` = the admin password to start with
+4. Deploy. Every later `git push` to `main` redeploys automatically.
 
 ## Admin features
 

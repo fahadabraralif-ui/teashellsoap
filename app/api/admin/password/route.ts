@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSessionToken, guard, SESSION_COOKIE } from "@/lib/auth";
-import { readDB, updateDB } from "@/lib/db";
+import { readMeta, updateDB } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 
 export async function POST(req: Request) {
   const denied = await guard();
   if (denied) return denied;
   const { current, next } = await req.json().catch(() => ({}));
-  const { admin } = await readDB();
+  const { admin } = await readMeta();
   if (!verifyPassword(String(current || ""), admin.passwordHash)) {
     return NextResponse.json({ error: "বর্তমান পাসওয়ার্ড ভুল" }, { status: 400 });
   }

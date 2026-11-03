@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { updateDB } from "@/lib/db";
 import { clientIp, nextOrderId, orderToken, sendCapiPurchase } from "@/lib/orders";
 import type { Order } from "@/lib/types";
@@ -83,6 +83,7 @@ export async function POST(req: Request) {
 
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  void sendCapiPurchase(result.order, result.settings, req.headers.get("referer") || "");
+  // Runs after the response is sent; on serverless the function stays alive until it finishes.
+  after(() => sendCapiPurchase(result.order, result.settings, req.headers.get("referer") || ""));
   return NextResponse.json({ id: result.order.id, total: result.order.total, token: result.token });
 }

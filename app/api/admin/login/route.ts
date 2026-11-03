@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSessionToken, SESSION_COOKIE } from "@/lib/auth";
-import { readDB } from "@/lib/db";
+import { readMeta } from "@/lib/db";
 import { clientIp } from "@/lib/orders";
 import { verifyPassword } from "@/lib/password";
 
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   }
 
   const { password } = await req.json().catch(() => ({ password: "" }));
-  const { admin } = await readDB();
+  const { admin } = await readMeta();
   if (!password || !verifyPassword(String(password), admin.passwordHash)) {
     const count = (entry && entry.until > Date.now() ? entry.count : 0) + 1;
     attempts.set(ip, { count, until: Date.now() + LOCK_MS });

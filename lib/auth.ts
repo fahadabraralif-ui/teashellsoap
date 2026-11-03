@@ -2,7 +2,7 @@ import "server-only";
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { readDB } from "./db";
+import { readMeta } from "./db";
 
 export const SESSION_COOKIE = "ts_admin";
 const SESSION_DAYS = 7;
@@ -12,7 +12,7 @@ function sign(payload: string, secret: string) {
 }
 
 export async function createSessionToken(): Promise<{ token: string; maxAge: number }> {
-  const { admin } = await readDB();
+  const { admin } = await readMeta();
   const maxAge = SESSION_DAYS * 24 * 60 * 60;
   const exp = Date.now() + maxAge * 1000;
   // Tie the token to the current password hash so changing the password logs out other sessions.
@@ -25,7 +25,7 @@ export async function isAdmin(): Promise<boolean> {
   if (!token) return false;
   const [exp, sig] = token.split(".");
   if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const { admin } = await readDB();
+  const { admin } = await readMeta();
   const expected = sign(exp + admin.passwordHash, admin.sessionSecret);
   return sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }

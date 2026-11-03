@@ -2,8 +2,10 @@ import "server-only";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
-import type { DB, PublicSettings, Settings } from "./types";
+import type { AnyBulkWriteOperation } from "mongodb";
+import type { DB, IncompleteOrder, Order, PublicSettings, Settings } from "./types";
 import { hashPassword } from "./password";
+import { mongo, mongoEnabled } from "./mongo";
 
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -77,6 +79,18 @@ function mergeDefaults<T>(defaults: T, value: unknown): T {
   return (value === undefined || value === null ? defaults : value) as T;
 }
 
+function freshAdmin(): DB["admin"] {
+  return {
+    passwordHash: hashPassword(process.env.ADMIN_PASSWORD || "admin123"),
+    sessionSecret: crypto.randomBytes(32).toString("hex"),
+  };
+}
+
+export type Meta = Pick<DB, "nextOrderId" | "settings" | "admin">;
+const metaOf = (db: DB): Meta => ({ nextOrderId: db.nextOrderId, settings: db.settings, admin: db.admin });
+
+// ───────── file backend (local / VPS) ─────────
+
 // Kept on globalThis so every route bundle in the process shares one copy and one write queue.
 const g = globalThis as unknown as { __tsDb?: DB; __tsQueue?: Promise<unknown> };
 
@@ -109,22 +123,14 @@ async function load(): Promise<DB> {
     };
   }
   if (!db.admin?.passwordHash) {
-    db.admin = {
-      passwordHash: hashPassword(process.env.ADMIN_PASSWORD || "admin123"),
-      sessionSecret: crypto.randomBytes(32).toString("hex"),
-    };
+    db.admin = freshAdmin();
     await persist(db);
   }
   g.__tsDb = db;
   return db;
 }
 
-export function readDB(): Promise<DB> {
-  return (g.__tsQueue ?? Promise.resolve()).then(load);
-}
-
-/** Serialised read-modify-write; the callback may mutate `db` directly. */
-export function updateDB<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
+function fileUpdate<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
   const run = (g.__tsQueue ?? Promise.resolve()).then(async () => {
     const db = await load();
     const result = await fn(db);
@@ -135,8 +141,126 @@ export function updateDB<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
   return run;
 }
 
+// ───────── MongoDB backend (Vercel / serverless) ─────────
+// Layout: meta {_id:"main", nextOrderId, settings, admin}, orders {_id: order.id}, incomplete {_id: id}.
+// Writes are serialised across server instances with a lease in `locks`, then only changed docs are written.
+
+type MetaDoc = { _id: string; nextOrderId?: number; settings?: unknown; admin?: DB["admin"] };
+
+async function mongoMeta(): Promise<Meta> {
+  const m = await mongo();
+  const metaCol = m.collection<MetaDoc>("meta");
+  let raw = await metaCol.findOne({ _id: "main" });
+  if (!raw?.admin?.passwordHash) {
+    try {
+      await metaCol.updateOne(
+        { _id: "main", "admin.passwordHash": { $exists: false } },
+        { $set: { admin: freshAdmin(), nextOrderId: raw?.nextOrderId ?? 1001, settings: mergeDefaults(defaultSettings(), raw?.settings) } },
+        { upsert: true },
+      );
+    } catch (e) {
+      if ((e as { code?: number }).code !== 11000) throw e; // another instance initialised it first
+    }
+    raw = await metaCol.findOne({ _id: "main" });
+  }
+  return {
+    nextOrderId: raw?.nextOrderId ?? 1001,
+    settings: mergeDefaults(defaultSettings(), raw?.settings),
+    admin: raw!.admin!,
+  };
+}
+
+async function mongoAll(): Promise<DB> {
+  const m = await mongo();
+  const [meta, orders, incomplete] = await Promise.all([
+    mongoMeta(),
+    m.collection("orders").find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray(),
+    m.collection("incomplete").find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray(),
+  ]);
+  return { ...meta, orders: orders as unknown as Order[], incomplete: incomplete as unknown as IncompleteOrder[] };
+}
+
+async function withLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = (await mongo()).collection<{ _id: string; until: number; owner: string }>("locks");
+  const owner = crypto.randomUUID();
+  for (let attempt = 0; ; attempt++) {
+    const now = Date.now();
+    try {
+      await locks.findOneAndUpdate({ _id: "db", until: { $lt: now } }, { $set: { until: now + 15_000, owner } }, { upsert: true });
+      break;
+    } catch (e) {
+      // Duplicate key means the lease is held by someone else.
+      if ((e as { code?: number }).code !== 11000) throw e;
+    }
+    if (attempt > 150) throw new Error("Database busy, please retry");
+    await new Promise((r) => setTimeout(r, 40 + Math.random() * 80));
+  }
+  try {
+    return await fn();
+  } finally {
+    await locks.updateOne({ _id: "db", owner }, { $set: { until: 0 } });
+  }
+}
+
+async function syncCollection<T extends object, K extends string | number>(
+  name: string,
+  items: T[],
+  key: (item: T) => K,
+  before: Map<K, string>,
+) {
+  type KeyedDoc = { _id: string | number };
+  const ops: AnyBulkWriteOperation<KeyedDoc>[] = [];
+  const seen = new Set<K>();
+  for (const item of items) {
+    const k = key(item);
+    seen.add(k);
+    if (before.get(k) !== JSON.stringify(item)) {
+      ops.push({ replaceOne: { filter: { _id: k }, replacement: { ...item, _id: k }, upsert: true } });
+    }
+  }
+  for (const k of before.keys()) if (!seen.has(k)) ops.push({ deleteOne: { filter: { _id: k } } });
+  if (ops.length) await (await mongo()).collection<KeyedDoc>(name).bulkWrite(ops, { ordered: false });
+}
+
+function mongoUpdate<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
+  return withLock(async () => {
+    const db = await mongoAll();
+    const metaBefore = JSON.stringify(metaOf(db));
+    const ordersBefore = new Map(db.orders.map((o) => [o.id, JSON.stringify(o)]));
+    const incompleteBefore = new Map(db.incomplete.map((i) => [i.id, JSON.stringify(i)]));
+
+    const result = await fn(db);
+
+    const meta = metaOf(db);
+    if (JSON.stringify(meta) !== metaBefore) {
+      await (await mongo()).collection<MetaDoc>("meta").replaceOne({ _id: "main" }, meta, { upsert: true });
+    }
+    await syncCollection("orders", db.orders, (o) => o.id, ordersBefore);
+    await syncCollection("incomplete", db.incomplete, (i) => i.id, incompleteBefore);
+    return result;
+  });
+}
+
+// ───────── public API ─────────
+
+export function readDB(): Promise<DB> {
+  if (mongoEnabled()) return mongoAll();
+  return (g.__tsQueue ?? Promise.resolve()).then(load);
+}
+
+/** Settings + admin auth only; cheaper than readDB on MongoDB. */
+export async function readMeta(): Promise<Meta> {
+  if (mongoEnabled()) return mongoMeta();
+  return metaOf(await readDB());
+}
+
+/** Serialised read-modify-write; the callback may mutate `db` directly. */
+export function updateDB<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
+  return mongoEnabled() ? mongoUpdate(fn) : fileUpdate(fn);
+}
+
 export async function getPublicSettings(): Promise<PublicSettings> {
-  const { settings } = await readDB();
+  const { settings } = await readMeta();
   return {
     product: settings.product,
     delivery: settings.delivery,

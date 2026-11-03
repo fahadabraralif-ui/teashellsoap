@@ -1,9 +1,7 @@
 import crypto from "crypto";
-import fs from "fs/promises";
-import path from "path";
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/auth";
-import { UPLOAD_DIR } from "@/lib/db";
+import { saveUpload } from "@/lib/uploads";
 
 const ALLOWED: Record<string, string> = {
   "image/png": ".png",
@@ -23,8 +21,7 @@ export async function POST(req: Request) {
   if (!ext) return NextResponse.json({ error: "শুধু PNG, JPG, WEBP বা GIF ছবি" }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "ছবি ৫MB এর বেশি হতে পারবে না" }, { status: 400 });
 
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const name = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
-  await fs.writeFile(path.join(UPLOAD_DIR, name), Buffer.from(await file.arrayBuffer()));
+  await saveUpload(name, file.type, Buffer.from(await file.arrayBuffer()));
   return NextResponse.json({ url: `/api/uploads/${name}` });
 }
