@@ -14,18 +14,18 @@ npm run build && npm start
 
 ## Data
 
-- **`MONGODB_URI` set** (Vercel): orders, settings and uploaded images are stored in MongoDB.
+- **`DATABASE_URL` set** (Vercel + Neon Postgres): orders, settings and uploaded images are stored in Postgres.
+  Tables (`ts_*`) are created automatically on first request.
 - **Not set** (local / VPS): everything lives in `./data` (`db.json` + `uploads/`), or in `DATA_DIR`.
+
+`vercel link` writes `.env.local` with the Neon `DATABASE_URL`, so `npm run dev` on this machine talks to the
+**live** database. Rename `.env.local` if you want a local-only test database.
 
 ## Deploy on Vercel
 
-1. Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/atlas). Add a database user, and under
-   *Network Access* allow `0.0.0.0/0` (Vercel has no fixed IP). Copy the connection string.
-2. On [vercel.com](https://vercel.com) → *Add New → Project* → import this GitHub repo.
-3. Before deploying, add Environment Variables:
-   - `MONGODB_URI` = the Atlas connection string (with your password filled in)
-   - `ADMIN_PASSWORD` = the admin password to start with
-4. Deploy. Every later `git push` to `main` redeploys automatically.
+The project is linked to Vercel (`teashellsoap`) with a Neon Postgres database (Singapore, free plan).
+Every `git push` to `main` redeploys automatically. `ADMIN_PASSWORD` in Vercel's env only seeds the very first
+admin password; change it later from the admin panel.
 
 ## Admin features
 

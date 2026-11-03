@@ -2,10 +2,9 @@ import "server-only";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
-import type { AnyBulkWriteOperation } from "mongodb";
 import type { DB, IncompleteOrder, Order, PublicSettings, Settings } from "./types";
 import { hashPassword } from "./password";
-import { mongo, mongoEnabled } from "./mongo";
+import { pgEnabled, pgReady, pool, type Queryable } from "./pg";
 
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -141,122 +140,104 @@ function fileUpdate<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
   return run;
 }
 
-// ───────── MongoDB backend (Vercel / serverless) ─────────
-// Layout: meta {_id:"main", nextOrderId, settings, admin}, orders {_id: order.id}, incomplete {_id: id}.
-// Writes are serialised across server instances with a lease in `locks`, then only changed docs are written.
+// ───────── Postgres backend (Vercel + Neon) ─────────
+// Tables (see lib/pg.ts): ts_meta (id 'main' → nextOrderId/settings/admin), ts_orders, ts_incomplete.
+// Each write runs in a transaction holding an advisory lock, then upserts only the rows that changed.
 
-type MetaDoc = { _id: string; nextOrderId?: number; settings?: unknown; admin?: DB["admin"] };
+type MetaRow = { nextOrderId?: number; settings?: unknown; admin?: DB["admin"] };
 
-async function mongoMeta(): Promise<Meta> {
-  const m = await mongo();
-  const metaCol = m.collection<MetaDoc>("meta");
-  let raw = await metaCol.findOne({ _id: "main" });
-  if (!raw?.admin?.passwordHash) {
-    try {
-      await metaCol.updateOne(
-        { _id: "main", "admin.passwordHash": { $exists: false } },
-        { $set: { admin: freshAdmin(), nextOrderId: raw?.nextOrderId ?? 1001, settings: mergeDefaults(defaultSettings(), raw?.settings) } },
-        { upsert: true },
-      );
-    } catch (e) {
-      if ((e as { code?: number }).code !== 11000) throw e; // another instance initialised it first
-    }
-    raw = await metaCol.findOne({ _id: "main" });
+async function pgMeta(q: Queryable = pool()): Promise<Meta> {
+  await pgReady();
+  let row = (await q.query<{ data: MetaRow }>("select data from ts_meta where id = 'main'")).rows[0]?.data;
+  if (!row?.admin?.passwordHash) {
+    const init: Meta = { nextOrderId: row?.nextOrderId ?? 1001, settings: mergeDefaults(defaultSettings(), row?.settings), admin: freshAdmin() };
+    // If another instance initialised it first, keep theirs.
+    await q.query(
+      `insert into ts_meta (id, data) values ('main', $1::jsonb)
+       on conflict (id) do update set data = excluded.data where ts_meta.data->'admin'->>'passwordHash' is null`,
+      [JSON.stringify(init)],
+    );
+    row = (await q.query<{ data: MetaRow }>("select data from ts_meta where id = 'main'")).rows[0].data;
   }
   return {
-    nextOrderId: raw?.nextOrderId ?? 1001,
-    settings: mergeDefaults(defaultSettings(), raw?.settings),
-    admin: raw!.admin!,
+    nextOrderId: row.nextOrderId ?? 1001,
+    settings: mergeDefaults(defaultSettings(), row.settings),
+    admin: row.admin!,
   };
 }
 
-async function mongoAll(): Promise<DB> {
-  const m = await mongo();
-  const [meta, orders, incomplete] = await Promise.all([
-    mongoMeta(),
-    m.collection("orders").find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray(),
-    m.collection("incomplete").find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray(),
-  ]);
-  return { ...meta, orders: orders as unknown as Order[], incomplete: incomplete as unknown as IncompleteOrder[] };
+async function pgAll(q: Queryable = pool()): Promise<DB> {
+  const meta = await pgMeta(q);
+  const orders = await q.query<{ data: Order }>("select data from ts_orders order by created_at desc, id desc");
+  const incomplete = await q.query<{ data: IncompleteOrder }>("select data from ts_incomplete order by created_at desc");
+  return { ...meta, orders: orders.rows.map((r) => r.data), incomplete: incomplete.rows.map((r) => r.data) };
 }
 
-async function withLock<T>(fn: () => Promise<T>): Promise<T> {
-  const locks = (await mongo()).collection<{ _id: string; until: number; owner: string }>("locks");
-  const owner = crypto.randomUUID();
-  for (let attempt = 0; ; attempt++) {
-    const now = Date.now();
-    try {
-      await locks.findOneAndUpdate({ _id: "db", until: { $lt: now } }, { $set: { until: now + 15_000, owner } }, { upsert: true });
-      break;
-    } catch (e) {
-      // Duplicate key means the lease is held by someone else.
-      if ((e as { code?: number }).code !== 11000) throw e;
-    }
-    if (attempt > 150) throw new Error("Database busy, please retry");
-    await new Promise((r) => setTimeout(r, 40 + Math.random() * 80));
-  }
-  try {
-    return await fn();
-  } finally {
-    await locks.updateOne({ _id: "db", owner }, { $set: { until: 0 } });
-  }
-}
-
-async function syncCollection<T extends object, K extends string | number>(
-  name: string,
+async function syncTable<T extends { createdAt: string }, K extends string | number>(
+  q: Queryable,
+  table: "ts_orders" | "ts_incomplete",
   items: T[],
   key: (item: T) => K,
   before: Map<K, string>,
 ) {
-  type KeyedDoc = { _id: string | number };
-  const ops: AnyBulkWriteOperation<KeyedDoc>[] = [];
   const seen = new Set<K>();
   for (const item of items) {
     const k = key(item);
     seen.add(k);
-    if (before.get(k) !== JSON.stringify(item)) {
-      ops.push({ replaceOne: { filter: { _id: k }, replacement: { ...item, _id: k }, upsert: true } });
-    }
+    if (before.get(k) === JSON.stringify(item)) continue;
+    await q.query(
+      `insert into ${table} (id, created_at, data) values ($1, $2, $3::jsonb)
+       on conflict (id) do update set created_at = excluded.created_at, data = excluded.data`,
+      [k, item.createdAt, JSON.stringify(item)],
+    );
   }
-  for (const k of before.keys()) if (!seen.has(k)) ops.push({ deleteOne: { filter: { _id: k } } });
-  if (ops.length) await (await mongo()).collection<KeyedDoc>(name).bulkWrite(ops, { ordered: false });
+  const removed = [...before.keys()].filter((k) => !seen.has(k));
+  if (removed.length) await q.query(`delete from ${table} where id = any($1)`, [removed]);
 }
 
-function mongoUpdate<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
-  return withLock(async () => {
-    const db = await mongoAll();
+async function pgUpdate<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
+  await pgReady();
+  const client = await pool().connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock(73317)");
+    const db = await pgAll(client);
     const metaBefore = JSON.stringify(metaOf(db));
     const ordersBefore = new Map(db.orders.map((o) => [o.id, JSON.stringify(o)]));
     const incompleteBefore = new Map(db.incomplete.map((i) => [i.id, JSON.stringify(i)]));
 
     const result = await fn(db);
 
-    const meta = metaOf(db);
-    if (JSON.stringify(meta) !== metaBefore) {
-      await (await mongo()).collection<MetaDoc>("meta").replaceOne({ _id: "main" }, meta, { upsert: true });
-    }
-    await syncCollection("orders", db.orders, (o) => o.id, ordersBefore);
-    await syncCollection("incomplete", db.incomplete, (i) => i.id, incompleteBefore);
+    const meta = JSON.stringify(metaOf(db));
+    if (meta !== metaBefore) await client.query("update ts_meta set data = $1::jsonb where id = 'main'", [meta]);
+    await syncTable(client, "ts_orders", db.orders, (o) => o.id, ordersBefore);
+    await syncTable(client, "ts_incomplete", db.incomplete, (i) => i.id, incompleteBefore);
+    await client.query("commit");
     return result;
-  });
+  } catch (e) {
+    await client.query("rollback").catch(() => undefined);
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 // ───────── public API ─────────
 
 export function readDB(): Promise<DB> {
-  if (mongoEnabled()) return mongoAll();
+  if (pgEnabled()) return pgAll();
   return (g.__tsQueue ?? Promise.resolve()).then(load);
 }
 
-/** Settings + admin auth only; cheaper than readDB on MongoDB. */
+/** Settings + admin auth only; cheaper than readDB on Postgres. */
 export async function readMeta(): Promise<Meta> {
-  if (mongoEnabled()) return mongoMeta();
+  if (pgEnabled()) return pgMeta();
   return metaOf(await readDB());
 }
 
 /** Serialised read-modify-write; the callback may mutate `db` directly. */
 export function updateDB<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
-  return mongoEnabled() ? mongoUpdate(fn) : fileUpdate(fn);
+  return pgEnabled() ? pgUpdate(fn) : fileUpdate(fn);
 }
 
 export async function getPublicSettings(): Promise<PublicSettings> {
