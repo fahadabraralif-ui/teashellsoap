@@ -79,3 +79,17 @@ body {
   .no-print { display: none !important; }
   body { background: #fff; }
 }
+
+/* Landing voice (admin > সাইট সেটিংস > ভয়েস) */
+.voice-wrap { position: fixed; left: 16px; bottom: 88px; z-index: 45; display: flex; align-items: center; gap: 8px; }
+@media (min-width: 768px) { .voice-wrap { bottom: 24px; } }
+.voice-toggle {
+  width: 48px; height: 48px; border-radius: 9999px; border: 2px solid #f8bbd0; background: #fff;
+  font-size: 22px; box-shadow: 0 8px 20px rgba(194, 24, 91, .25); cursor: pointer;
+}
+.voice-toggle.on, .voice-toggle.wait { border-color: #c2185b; animation: pulse-ring 2s infinite; }
+.voice-hint {
+  border: 0; border-radius: 9999px; background: #c2185b; color: #fff; font-weight: 600; padding: 8px 14px;
+  box-shadow: 0 8px 20px rgba(194, 24, 91, .35); cursor: pointer; animation: voice-bounce 1.6s ease-in-out infinite;
+}
+@keyframes voice-bounce { 50% { transform: translateX(4px); } }

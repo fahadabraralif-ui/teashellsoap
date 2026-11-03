@@ -1,47 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import type { DeliveryArea, PublicSettings } from "@/lib/types";
-import { calcTotals, getPackages, normalizePhone, toBanglaDigits } from "@/lib/utils";
-import { track } from "@/lib/pixel";
+import { useRef, useState } from "react";
+import { bn } from "@/data/site";
 
-function sessionId() {
-  try {
-    const existing = localStorage.getItem("ts_sid");
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    localStorage.setItem("ts_sid", id);
-    return id;
-  } catch {
-    return Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
+export type FormProduct = { id: number; name: string; price: number; image: string; boxes: number };
+type Area = { id: string; label: string; charge: number };
+
+type Fbq = (...args: unknown[]) => void;
+type TrackWindow = Window & { fbq?: Fbq; dataLayer?: Record<string, unknown>[] };
+
+const taka = (n: number) => `৳${bn(n)}`;
+
+// Facebook er browser cookie (_fbp) ar ad click id (_fbc / fbclid) — confirm er por server event e lage
+function fbIds() {
+  const cookie = (k: string) => document.cookie.split("; ").find((c) => c.startsWith(k + "="))?.split("=")[1] || "";
+  const fbclid = new URLSearchParams(location.search).get("fbclid");
+  return {
+    fbp: cookie("_fbp"),
+    fbc: cookie("_fbc") || (fbclid ? `fb.1.${Date.now()}.${fbclid}` : ""),
+    pageUrl: location.href.split("#")[0],
+  };
 }
 
-const taka = (n: number) => `৳${toBanglaDigits(n.toLocaleString("en-IN"))}`;
-
-/** Colours the "নিচের ফরমটি" part of the heading, like the reference design. */
-function FormTitle({ text }: { text: string }) {
-  const key = "নিচের ফরমটি";
-  const i = text.indexOf(key);
-  if (i < 0) return <>{text}</>;
-  return (
-    <>
-      {text.slice(0, i)}
-      <span className="text-brand">{key}</span>
-      {text.slice(i + key.length)}
-    </>
-  );
-}
-
-function Stepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max: number }) {
+function Stepper({ value, onChange }: { value: number; onChange: (diff: number) => void }) {
   return (
     <div className="inline-flex items-center overflow-hidden rounded-lg border border-pink-300 bg-white" onClick={(e) => e.stopPropagation()}>
-      <button type="button" aria-label="কমান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-pink-50" onClick={() => onChange(Math.max(1, value - 1))}>
+      <button type="button" aria-label="কমান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-pink-50" onClick={() => onChange(-1)}>
         −
       </button>
-      <span className="w-8 text-center font-bold">{toBanglaDigits(value)}</span>
-      <button type="button" aria-label="বাড়ান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-pink-50" onClick={() => onChange(Math.min(max, value + 1))}>
+      <span className="w-8 text-center font-bold">{bn(value)}</span>
+      <button type="button" aria-label="বাড়ান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-pink-50" onClick={() => onChange(1)}>
         +
       </button>
     </div>
@@ -56,261 +44,284 @@ function Radio({ checked }: { checked: boolean }) {
   );
 }
 
-export default function OrderForm({ settings }: { settings: PublicSettings }) {
-  const { product, delivery, content } = settings;
-  const router = useRouter();
-  const packages = getPackages(product);
-
-  const [packageId, setPackageId] = useState(packages[0].id);
-  const [qtys, setQtys] = useState<Record<string, number>>({});
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [phone, setPhone] = useState("");
-  const [area, setArea] = useState<DeliveryArea>("inside");
-  const [note, setNote] = useState("");
+// text: admin > ল্যান্ডিং পেজ টেক্সট er lekha
+export default function OrderForm({
+  products,
+  delivery,
+  freeBoxes = 0,
+  text,
+}: {
+  products: FormProduct[];
+  delivery: Area[];
+  freeBoxes?: number;
+  text: Record<string, string>;
+}) {
+  const [pkg, setPkg] = useState(products[0]?.id);
+  const [qty, setQty] = useState<Record<number, number>>(() => Object.fromEntries(products.map((p) => [p.id, 1])));
+  const [area, setArea] = useState(delivery[0].id);
+  const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const sid = useRef("");
-  const checkoutTracked = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const savedDraft = useRef("");
+  const checkoutSent = useRef(false);
 
-  const pkg = packages.find((p) => p.id === packageId) ?? packages[0];
-  const qtyOf = (id: string) => qtys[id] ?? 1;
-  const packageQty = qtyOf(pkg.id);
-  const quantity = pkg.quantity * packageQty;
-  const subtotal = pkg.price * packageQty;
-  const totals = useMemo(() => calcTotals(subtotal, quantity, area, delivery), [subtotal, quantity, area, delivery]);
-  const maxPackages = (p: (typeof packages)[number]) => Math.max(1, Math.floor(product.maxQuantity / p.quantity));
-  const freeDelivery = delivery.freeDeliveryMinQty > 0 && quantity >= delivery.freeDeliveryMinQty;
-  const outOfStock = product.stock <= 0;
+  const selected = products.find((p) => p.id === pkg) || products[0];
+  // Mot box (package er box × quantity) freeBoxes chhuley delivery free — server o eki niyome hishab kore
+  const totalBoxes = selected ? (Number(selected.boxes) || 1) * qty[selected.id] : 0;
+  const freeShip = freeBoxes > 0 && totalBoxes >= freeBoxes;
+  const charge = freeShip ? 0 : delivery.find((d) => d.id === area)!.charge;
+  const subtotal = selected ? selected.price * qty[selected.id] : 0;
+  const total = subtotal + charge;
 
-  useEffect(() => {
-    sid.current = sessionId();
-  }, []);
+  const changeQty = (id: number, diff: number) => {
+    setPkg(id);
+    setQty((q) => ({ ...q, [id]: Math.min(10, Math.max(1, q[id] + diff)) }));
+  };
 
-  // Save partially filled forms so the admin can call customers who didn't finish.
-  useEffect(() => {
-    if (!normalizePhone(phone)) return;
-    const t = setTimeout(() => {
-      fetch("/api/incomplete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sid: sid.current, name, phone, address, area, quantity }),
-        keepalive: true,
-      }).catch(() => undefined);
-    }, 1200);
-    return () => clearTimeout(t);
-  }, [name, phone, address, area, quantity]);
-
-  function onFirstInput() {
-    if (checkoutTracked.current) return;
-    checkoutTracked.current = true;
-    track("InitiateCheckout", { currency: "BDT", value: subtotal, content_name: product.name });
+  // Customer form e prothom bar click/type korlei Pixel e InitiateCheckout (ekbar i)
+  function onStartCheckout() {
+    if (checkoutSent.current) return;
+    checkoutSent.current = true;
+    const w = window as TrackWindow;
+    w.fbq?.("track", "InitiateCheckout", { value: total, currency: "BDT", num_items: totalBoxes });
+    w.dataLayer?.push({ event: "begin_checkout", value: total, currency: "BDT" });
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (name.trim().length < 2) return setError("অনুগ্রহ করে আপনার নাম লিখুন");
-    if (address.trim().length < 8) return setError("অনুগ্রহ করে সম্পূর্ণ ঠিকানা লিখুন");
-    if (!normalizePhone(phone)) return setError("সঠিক ১১ ডিজিটের মোবাইল নম্বর লিখুন (যেমন: 01XXXXXXXXX)");
+  // Customer phone number likhe order na korle "অসম্পূর্ণ অর্ডার" e save hoy
+  function saveDraft() {
+    const form = new FormData(formRef.current!);
+    const phone = String(form.get("phone") || "").trim();
+    if (!/^01[3-9]\d{8}$/.test(phone)) return;
+    const draft = { phone, website: form.get("website"), name: form.get("name"), address: form.get("address"), product: selected?.name };
+    const key = JSON.stringify(draft);
+    if (key === savedDraft.current) return;
+    savedDraft.current = key;
+    fetch("/api/incomplete", { method: "POST", headers: { "Content-Type": "application/json" }, body: key }).catch(() => {});
+  }
 
-    setSubmitting(true);
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const phone = String(form.get("phone")).trim();
+    if (!/^01[3-9]\d{8}$/.test(phone)) {
+      setError("সঠিক ১১ ডিজিটের মোবাইল নাম্বার দিন");
+      return;
+    }
+    setError("");
+    setStatus("loading");
     try {
-      const res = await fetch("/api/orders", {
+      const res = await fetch("/api/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sid: sid.current, name, phone, address, area, packageId: pkg.id, packageQty, note }),
+        body: JSON.stringify({
+          website: form.get("website"),
+          ...fbIds(),
+          name: form.get("name"),
+          phone,
+          address: form.get("address"),
+          productId: selected.id,
+          area,
+          qty: qty[selected.id],
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "অর্ডার করা যায়নি, আবার চেষ্টা করুন");
-      // The Purchase pixel event fires on the thank-you page.
-      router.push(`/thank-you?id=${data.id}&t=${data.token}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error);
+      // Purchase: browser theke + server theke (Conversions API) — ek eventID, Facebook ekbar-i gone
+      const w = window as TrackWindow;
+      if (data.id) {
+        w.fbq?.(
+          "track",
+          "Purchase",
+          { value: total, currency: "BDT", content_ids: [String(selected.id)], content_type: "product", num_items: qty[selected.id] },
+          { eventID: `purchase-${data.id}` },
+        );
+      }
+      w.dataLayer?.push({ event: "order_placed", value: total, currency: "BDT" });
+      setStatus("done");
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
-      setError((err as Error).message);
-      setSubmitting(false);
+      setStatus("idle");
+      setError((err as Error).message || "অর্ডার পাঠানো যায়নি, আবার চেষ্টা করুন বা কল করুন");
     }
   }
 
-  return (
-    <div>
-      <h2 className="mx-auto mb-6 max-w-2xl text-center font-display text-[1.7rem] font-extrabold leading-snug text-slate-900 md:text-4xl">
-        <FormTitle text={content.orderFormTitle} />
-      </h2>
+  if (!selected) return <p className="card p-6 text-center">এই মুহূর্তে কোনো পণ্য পাওয়া যাচ্ছে না।</p>;
 
-      <form onSubmit={submit} onInput={onFirstInput} className="rounded-3xl border-2 border-pink-200 bg-white/90 p-3 shadow-card backdrop-blur md:p-6">
-        {/* ───── packages ───── */}
-        <h3 className="mb-4 text-center font-display text-xl font-bold md:text-2xl">পছন্দের প্যাকেজ সিলেক্ট করুন</h3>
-        <div className="space-y-3">
-          {packages.map((p) => {
-            const active = p.id === pkg.id;
-            const q = qtyOf(p.id);
-            return (
-              <div
-                key={p.id}
-                role="radio"
-                aria-checked={active}
-                tabIndex={0}
-                onClick={() => setPackageId(p.id)}
-                onKeyDown={(e) => (e.key === " " || e.key === "Enter") && (e.preventDefault(), setPackageId(p.id))}
-                className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition ${
-                  active ? "border-brand bg-pink-50 shadow-sm" : "border-pink-100 bg-white hover:border-pink-300"
+  if (status === "done") {
+    return (
+      <div className="card mx-auto max-w-md p-6 text-center">
+        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-green-100 text-4xl text-green-600">✓</div>
+        <h3 className="mt-4 font-display text-2xl font-bold text-brand">{text.success_title}</h3>
+        <p className="mt-2 text-slate-700">{text.success_text}</p>
+        <p className="mt-4 rounded-xl bg-pink-50 py-3 text-lg font-bold">সর্বমোট: {taka(total)}</p>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      ref={formRef}
+      onSubmit={onSubmit}
+      onBlur={saveDraft}
+      onFocus={onStartCheckout}
+      className="scroll-mt-4 rounded-3xl border-2 border-pink-200 bg-white/90 p-3 shadow-card backdrop-blur md:p-6"
+    >
+      {/* Bot dhorar fad: manush eta dekhe na, bot puron kore */}
+      <input type="text" name="website" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] h-0 w-0 opacity-0" aria-hidden="true" />
+
+      {/* ───── packages ───── */}
+      <h3 className="mb-4 text-center font-display text-xl font-bold md:text-2xl">{text.form_head}</h3>
+      <div className="space-y-3">
+        {products.map((p) => {
+          const active = p.id === selected.id;
+          return (
+            <div
+              key={p.id}
+              role="radio"
+              aria-checked={active}
+              tabIndex={0}
+              onClick={() => setPkg(p.id)}
+              onKeyDown={(e) => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  setPkg(p.id);
+                }
+              }}
+              className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition ${
+                active ? "border-brand bg-pink-50 shadow-sm" : "border-pink-100 bg-white hover:border-pink-300"
+              }`}
+            >
+              <Radio checked={active} />
+              {p.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.image} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-pink-50 object-cover md:h-[72px] md:w-[72px]" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold leading-snug">{p.name}</p>
+                <div className="mt-2">
+                  <Stepper value={qty[p.id]} onChange={(d) => changeQty(p.id, d)} />
+                </div>
+              </div>
+              <p className="shrink-0 self-center text-right text-lg font-bold text-brand">{taka(p.price)}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
+        {/* ───── billing + shipping ───── */}
+        <div>
+          <h3 className="mb-3 text-xl font-bold">{text.billing_title}</h3>
+          <div className="space-y-4">
+            <label className="block">
+              <span className="mb-1 block font-semibold">
+                {text.name_label} <span className="text-red-500">*</span>
+              </span>
+              <input name="name" required className="input" placeholder={text.name_ph} autoComplete="name" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-semibold">
+                {text.address_label} <span className="text-red-500">*</span>
+              </span>
+              <input name="address" required className="input" placeholder={text.address_ph} autoComplete="street-address" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-semibold">
+                {text.phone_label} <span className="text-red-500">*</span>
+              </span>
+              <input name="phone" required inputMode="numeric" maxLength={11} className="input" placeholder="01XXXXXXXXX" autoComplete="tel" />
+            </label>
+          </div>
+
+          <h3 className="mb-3 mt-6 text-xl font-bold">{text.shipping_title}</h3>
+          {freeBoxes > 0 && (
+            <p
+              className={`mb-3 rounded-xl border border-dashed px-4 py-2.5 font-semibold ${
+                freeShip ? "border-green-400 bg-green-50 text-green-800" : "border-amber-400 bg-amber-50 text-amber-800"
+              }`}
+            >
+              {freeShip ? text.free_done : text.free_hint}
+            </p>
+          )}
+          <div className="space-y-2.5">
+            {delivery.map((d) => (
+              <label
+                key={d.id}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition ${
+                  area === d.id ? "border-brand bg-pink-50" : "border-pink-100 bg-white hover:border-pink-300"
                 }`}
               >
-                <Radio checked={active} />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={product.image} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-pink-50 object-cover md:h-[72px] md:w-[72px]" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold leading-snug">
-                    {product.name} — <span className="text-brand">{p.label}</span>
-                  </p>
-                  <div className="mt-2">
-                    <Stepper
-                      value={q}
-                      max={maxPackages(p)}
-                      onChange={(n) => {
-                        setQtys((s) => ({ ...s, [p.id]: n }));
-                        setPackageId(p.id);
-                      }}
-                    />
-                  </div>
-                </div>
-                <p className="shrink-0 self-center text-right text-lg font-bold text-brand">{taka(p.price * q)}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          {/* ───── billing + shipping ───── */}
-          <div>
-            <h3 className="mb-3 text-xl font-bold">আপনার তথ্য</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block font-semibold">
-                  আপনার নাম <span className="text-red-500">*</span>
-                </label>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="আপনার নাম" autoComplete="name" />
-              </div>
-              <div>
-                <label className="mb-1 block font-semibold">
-                  আপনার ঠিকানা <span className="text-red-500">*</span>
-                </label>
-                <input
-                  className="input"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="বাসা/রোড, থানা, জেলা"
-                  autoComplete="street-address"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block font-semibold">
-                  মোবাইল নাম্বার <span className="text-red-500">*</span>
-                </label>
-                <input
-                  className="input"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="01XXXXXXXXX"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  maxLength={17}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block font-semibold">অতিরিক্ত নোট (ঐচ্ছিক)</label>
-                <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="কিছু জানাতে চাইলে লিখুন" />
-              </div>
-            </div>
-
-            <h3 className="mb-3 mt-6 text-xl font-bold">ডেলিভারি</h3>
-            {delivery.freeDeliveryMinQty > 0 && (
-              <p className="mb-3 rounded-xl border border-dashed border-amber-400 bg-amber-50 px-4 py-2.5 font-semibold text-amber-800">
-                🚚 {toBanglaDigits(delivery.freeDeliveryMinQty)} পিছ বা বেশি নিলে ডেলিভারি চার্জ ফ্রি!
-              </p>
-            )}
-            <div className="space-y-2.5">
-              {(["inside", "outside"] as const).map((a) => (
-                <label
-                  key={a}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition ${
-                    area === a ? "border-brand bg-pink-50" : "border-pink-100 bg-white hover:border-pink-300"
-                  }`}
-                >
-                  <input type="radio" name="area" checked={area === a} onChange={() => setArea(a)} className="sr-only" />
-                  <Radio checked={area === a} />
-                  <span className="flex-1 font-semibold">{a === "inside" ? delivery.insideLabel : delivery.outsideLabel}</span>
-                  <span className="font-bold">
-                    {freeDelivery ? (
-                      <>
-                        <del className="mr-1 text-sm font-normal text-slate-400">{taka(a === "inside" ? delivery.inside : delivery.outside)}</del>
-                        <span className="text-green-600">ফ্রি</span>
-                      </>
-                    ) : (
-                      taka(a === "inside" ? delivery.inside : delivery.outside)
-                    )}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* ───── order summary ───── */}
-          <div className="h-fit rounded-2xl border border-pink-200 bg-pink-50/60 p-4 md:p-6">
-            <h3 className="mb-4 text-xl font-bold">আপনার অর্ডার</h3>
-            <table className="w-full text-[15px]">
-              <thead>
-                <tr className="border-b border-pink-200 text-left">
-                  <th className="pb-2 font-bold">প্রোডাক্ট</th>
-                  <th className="pb-2 text-right font-bold">মূল্য</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-pink-200">
-                  <td className="py-3 pr-2">
-                    {product.name} — {pkg.label} <b>× {toBanglaDigits(packageQty)}</b>
-                  </td>
-                  <td className="py-3 text-right">{taka(subtotal)}</td>
-                </tr>
-                <tr className="border-b border-pink-200">
-                  <td className="py-3">সাবটোটাল</td>
-                  <td className="py-3 text-right">{taka(subtotal)}</td>
-                </tr>
-                <tr className="border-b border-pink-200">
-                  <td className="py-3">ডেলিভারি চার্জ</td>
-                  <td className="py-3 text-right">{totals.deliveryCharge === 0 ? <span className="font-semibold text-green-600">ফ্রি</span> : taka(totals.deliveryCharge)}</td>
-                </tr>
-                <tr>
-                  <td className="pt-3 text-xl font-bold text-brand">সর্বমোট</td>
-                  <td className="pt-3 text-right text-xl font-bold text-brand">{taka(totals.total)}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="mt-5 rounded-xl bg-white p-2">
-              <div className="flex items-center gap-3 rounded-lg border-2 border-brand bg-pink-50 px-3 py-2.5 font-semibold">
-                <Radio checked />
-                ক্যাশ অন ডেলিভারি
-              </div>
-              {content.paymentNote && <p className="px-2 pb-1 pt-3 text-sm leading-relaxed text-slate-600">{content.paymentNote}</p>}
-            </div>
-
-            <p className="mt-4 text-xs leading-relaxed text-slate-500">
-              আপনার দেওয়া তথ্য শুধুমাত্র অর্ডার প্রসেস ও ডেলিভারির জন্য ব্যবহার করা হবে।
-            </p>
-
-            {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
-
-            <button
-              type="submit"
-              disabled={submitting || outOfStock}
-              className="animate-pulse-ring mt-4 w-full rounded-full bg-gradient-to-b from-[#e91e63] to-[#a3104d] py-4 font-display text-2xl font-bold text-white shadow-lg transition hover:brightness-110 disabled:animate-none disabled:opacity-60"
-            >
-              {outOfStock ? "স্টক শেষ" : submitting ? "অপেক্ষা করুন..." : `অর্ডার করুন ${taka(totals.total)}`}
-            </button>
+                <input type="radio" name="area" checked={area === d.id} onChange={() => setArea(d.id)} className="sr-only" />
+                <Radio checked={area === d.id} />
+                <span className="flex-1 font-semibold">{d.label}</span>
+                <span className="font-bold">
+                  {freeShip ? (
+                    <>
+                      <del className="mr-1 text-sm font-normal text-slate-400">{taka(d.charge)}</del>
+                      <span className="text-green-600">ফ্রি</span>
+                    </>
+                  ) : (
+                    taka(d.charge)
+                  )}
+                </span>
+              </label>
+            ))}
           </div>
         </div>
-      </form>
-    </div>
+
+        {/* ───── order summary ───── */}
+        <div className="h-fit rounded-2xl border border-pink-200 bg-pink-50/60 p-4 md:p-6">
+          <h3 className="mb-4 text-xl font-bold">{text.summary_title}</h3>
+          <table className="w-full text-[15px]">
+            <thead>
+              <tr className="border-b border-pink-200 text-left">
+                <th className="pb-2 font-bold">প্রোডাক্ট</th>
+                <th className="pb-2 text-right font-bold">মূল্য</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-pink-200">
+                <td className="py-3 pr-2">
+                  {selected.name} <b>× {bn(qty[selected.id])}</b>
+                </td>
+                <td className="py-3 text-right">{taka(subtotal)}</td>
+              </tr>
+              <tr className="border-b border-pink-200">
+                <td className="py-3">সাবটোটাল</td>
+                <td className="py-3 text-right">{taka(subtotal)}</td>
+              </tr>
+              <tr className="border-b border-pink-200">
+                <td className="py-3">ডেলিভারি চার্জ</td>
+                <td className="py-3 text-right">{freeShip ? <span className="font-semibold text-green-600">ফ্রি 🎉</span> : taka(charge)}</td>
+              </tr>
+              <tr>
+                <td className="pt-3 text-xl font-bold text-brand">সর্বমোট</td>
+                <td className="pt-3 text-right text-xl font-bold text-brand">{taka(total)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="mt-5 rounded-xl bg-white p-2">
+            <div className="flex items-center gap-3 rounded-lg border-2 border-brand bg-pink-50 px-3 py-2.5 font-semibold">
+              <Radio checked />
+              {text.cod_label}
+            </div>
+            {text.hadith && <p className="px-2 pb-1 pt-3 text-sm leading-relaxed text-slate-600">{text.hadith}</p>}
+          </div>
+
+          {text.privacy && <p className="mt-4 text-xs leading-relaxed text-slate-500">{text.privacy}</p>}
+
+          {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={status === "loading"}
+            className="animate-pulse-ring mt-4 w-full rounded-full bg-gradient-to-b from-[#e91e63] to-[#a3104d] py-4 font-display text-2xl font-bold text-white shadow-lg transition hover:brightness-110 disabled:animate-none disabled:opacity-60"
+          >
+            {status === "loading" ? "অপেক্ষা করুন..." : `${text.submit_btn} ${taka(total)}`}
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }

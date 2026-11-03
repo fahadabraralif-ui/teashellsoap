@@ -1,12 +1,6 @@
-import MetaPixel from "@/components/MetaPixel";
-import { getPublicSettings } from "@/lib/db";
+// Tailwind styles only for the public site; the admin panel brings its own CSS.
+import "../globals.css";
 
-export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const { marketing } = await getPublicSettings();
-  return (
-    <>
-      {children}
-      <MetaPixel pixelId={marketing.pixelId} gtmId={marketing.gtmId} />
-    </>
-  );
+export default function SiteLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }
