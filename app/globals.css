@@ -81,7 +81,7 @@ body {
 }
 
 /* Landing voice (admin > সাইট সেটিংস > ভয়েস) */
-.voice-wrap { position: fixed; left: 16px; bottom: 88px; z-index: 45; display: flex; align-items: center; gap: 8px; }
+.voice-wrap { position: fixed; left: 16px; bottom: 24px; z-index: 45; display: flex; align-items: center; gap: 8px; }
 @media (min-width: 768px) { .voice-wrap { bottom: 24px; } }
 .voice-toggle {
   width: 48px; height: 48px; border-radius: 9999px; border: 2px solid #f8bbd0; background: #fff;

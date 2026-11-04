@@ -106,7 +106,7 @@ export default function Landing(props: LandingProps) {
         </div>
       )}
 
-      <main className="relative mx-auto max-w-[900px] overflow-hidden pb-28 md:pb-12">
+      <main className="relative mx-auto max-w-[900px] overflow-hidden pb-24 md:pb-12">
         {/* ───────── HERO ───────── */}
         <section className="relative md:min-h-[700px]">
           <div className="relative z-10 px-4 pt-6 text-center md:w-[56%] md:pl-10 md:pt-9 md:text-left">
@@ -297,7 +297,7 @@ export default function Landing(props: LandingProps) {
         </footer>
       </main>
 
-      <FloatingActions phone={phone} whatsapp={whatsapp} />
+      <FloatingActions whatsapp={whatsapp} />
     </div>
   );
 }
