@@ -25,7 +25,7 @@ const FORM_KEYS = [
 
 const GREEN = "text-[#1e5631]";
 const ORANGE_BTN =
-  "inline-flex items-center justify-center rounded-xl bg-[#f26b1d] font-bold text-white shadow-[0_8px_20px_-8px_rgba(242,107,29,0.7)] transition hover:bg-[#e05a10] hover:-translate-y-0.5";
+  "inline-flex items-center justify-center bg-[#f26b1d] font-bold text-white shadow-[0_8px_20px_-8px_rgba(242,107,29,0.7)] transition hover:bg-[#e05a10] hover:-translate-y-0.5";
 
 function Heading({ title, sub, dark = false }: { title: string; sub?: string; dark?: boolean }) {
   if (!title) return null;
@@ -58,48 +58,42 @@ export default function GlutaLanding(props: GlutaProps) {
       {t.topbar && <div className="bg-[#173d22] px-3 py-2 text-center text-xs font-semibold text-white md:text-sm">{t.topbar}</div>}
 
       {/* ───────── HEADER ───────── */}
-      <header className="border-b border-slate-100 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <span className={`font-display text-2xl font-extrabold uppercase tracking-wide ${GREEN}`}>
-            {/* Shesh 3 okkhor komla — design er moto */}
-            {brandName.length > 4 ? (
-              <>
-                {brandName.slice(0, -3)}
-                <span className="text-[#f26b1d]">{brandName.slice(-3)}</span>
-              </>
-            ) : (
-              brandName
-            )}
+      <header className="bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:py-4">
+          <span className={`font-display text-2xl font-extrabold uppercase tracking-wide md:text-[1.7rem] ${GREEN}`}>
+            {/* Prothom ordhek sobuj, baki komla — BON + ZELA */}
+            {brandName.slice(0, Math.floor(brandName.length / 2))}
+            <span className="text-[#f26b1d]">{brandName.slice(Math.floor(brandName.length / 2))}</span>
           </span>
-          <a href="#order" className={`${ORANGE_BTN} rounded-full px-5 py-2 text-sm md:text-base`}>
+          <a href="#order" className={`${ORANGE_BTN} rounded-full px-5 py-2 text-sm md:px-7 md:py-2.5 md:text-lg`}>
             {t.header_btn}
           </a>
         </div>
       </header>
 
       {/* ───────── HERO ───────── */}
-      <section className="bg-[#fdf6e3]">
-        <div className={`mx-auto grid max-w-6xl items-center gap-8 px-4 py-10 md:py-16 ${heroImage ? "md:grid-cols-2" : ""}`}>
+      <section className="bg-gradient-to-br from-[#fbf6e6] to-[#f8f3df]">
+        <div className={`mx-auto grid max-w-6xl items-center gap-10 px-4 py-10 md:gap-14 md:py-24 ${heroImage ? "md:grid-cols-[1.15fr_1fr]" : ""}`}>
           <div className={heroImage ? "" : "mx-auto max-w-2xl text-center"}>
             {t.hero_chip && (
-              <span className="inline-block rounded-full bg-[#e3efdc] px-3 py-1 text-[11px] font-bold tracking-wide text-[#1e5631] md:text-xs">
+              <span className="inline-block rounded-full bg-[#e3efdc] px-4 py-1.5 text-xs font-bold tracking-wide text-[#1e5631] md:text-sm">
                 {t.hero_chip}
               </span>
             )}
-            <h1 className="mt-4 whitespace-pre-line font-display text-[2.6rem] font-extrabold leading-[1.1] text-[#f26b1d] md:text-[3.4rem]">
+            <h1 className="mt-4 whitespace-pre-line font-display text-[2.7rem] font-extrabold leading-[1.1] text-[#e8541a] md:text-[3.9rem]">
               {t.hero_title}
             </h1>
-            {t.hero_tagline && <p className={`mt-3 text-xl font-bold md:text-2xl ${GREEN}`}>{t.hero_tagline}</p>}
+            {t.hero_tagline && <p className={`mt-3 text-xl font-bold md:text-[1.75rem] ${GREEN}`}>{t.hero_tagline}</p>}
             {t.hero_sub && <p className="mt-3 leading-relaxed text-slate-600 md:text-lg">{t.hero_sub}</p>}
 
-            <div className={`mt-6 flex flex-wrap gap-3 ${heroImage ? "" : "justify-center"}`}>
-              <a href="#order" className={`${ORANGE_BTN} px-6 py-3 text-lg`}>
+            <div className={`mt-7 flex flex-wrap gap-3 ${heroImage ? "" : "justify-center"}`}>
+              <a href="#order" className={`${ORANGE_BTN} rounded-xl px-6 py-3 text-lg md:px-7 md:py-4`}>
                 {t.cta_btn}
               </a>
               {t.more_btn && (
                 <a
                   href="#details"
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-[#1e5631]/20 bg-white px-6 py-3 text-lg font-bold text-[#1e5631] transition hover:border-[#1e5631]/50"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 text-lg md:px-7 md:py-4 font-bold text-[#1e5631] transition hover:border-[#1e5631]/50"
                 >
                   {t.more_btn}
                 </a>
@@ -109,7 +103,7 @@ export default function GlutaLanding(props: GlutaProps) {
             {notes.length > 0 && (
               <ul className={`mt-5 flex flex-wrap gap-2 ${heroImage ? "" : "justify-center"}`}>
                 {notes.map((n, i) => (
-                  <li key={i} className="flex items-center gap-1 rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-black/5">
+                  <li key={i} className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 md:text-base">
                     <Check className="h-3.5 w-3.5 text-[#1e5631]" />
                     {n}
                   </li>
@@ -123,7 +117,7 @@ export default function GlutaLanding(props: GlutaProps) {
             <img
               src={heroImage}
               alt={t.hero_title?.replace(/\n/g, " ") || brand}
-              className="w-full rounded-3xl bg-white object-cover shadow-[0_25px_50px_-20px_rgba(30,86,49,0.45)]"
+              className="w-full rounded-[1.75rem] bg-white object-cover shadow-[0_30px_60px_-25px_rgba(30,86,49,0.5)] md:ml-auto md:max-w-[36rem]"
             />
           )}
         </div>
@@ -219,7 +213,7 @@ export default function GlutaLanding(props: GlutaProps) {
                     <p className={`mt-3 text-lg font-bold ${GREEN}`}>{p.name}</p>
                     <p className="mt-1 font-display text-4xl font-extrabold text-[#f26b1d]">৳{bn(p.price)}</p>
                     {t.pkg_note && <p className="mt-1 text-sm text-slate-500">{boxesText(t.pkg_note, p.boxes)}</p>}
-                    <PackageButton id={p.id} text={t.pkg_btn} className={`${ORANGE_BTN} mt-5 w-full px-4 py-3`} />
+                    <PackageButton id={p.id} text={t.pkg_btn} className={`${ORANGE_BTN} mt-5 w-full rounded-xl px-4 py-3`} />
                   </div>
                 );
               })}
