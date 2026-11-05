@@ -2,6 +2,7 @@ import { bn } from "@/data/site";
 import OrderForm, { type FormProduct } from "../landing/OrderForm";
 import FloatingActions from "../landing/FloatingActions";
 import PackageButton from "./PackageButton";
+import Countdown from "./Countdown";
 
 type Item = Record<string, string>;
 
@@ -105,6 +106,9 @@ export default function GlutaLanding(props: GlutaProps) {
           )}
         </div>
       </section>
+
+      {/* ───────── COUNTDOWN (protidin rat 12 tay notun kore 24 ghonta) ───────── */}
+      {t.timer_text !== "" && <Countdown label={t.timer_text} />}
 
       {/* ───────── INGREDIENTS ───────── */}
       {lists.ingredients.length > 0 && (
