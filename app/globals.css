@@ -4,6 +4,31 @@
 
 :root {
   --pink-bg: #fde7ef;
+  /* Theme rong (RGB) — tailwind er brand-* / tint-* egulo theke ashe */
+  --brand: 194 24 91;
+  --brand-dark: 156 15 71;
+  --brand-deep: 122 10 55;
+  --tint-50: 253 242 248;
+  --tint-100: 252 231 243;
+  --tint-200: 251 207 232;
+  --tint-300: 249 168 212;
+  --ring: 216 27 96;
+  --cta-from: #e91e63;
+  --cta-to: #a3104d;
+}
+
+/* /doublegluta — sobuj + komla (form er bottom ar ghor komla) */
+.theme-gluta {
+  --brand: 234 88 12;
+  --brand-dark: 194 65 12;
+  --brand-deep: 154 52 18;
+  --tint-50: 255 247 237;
+  --tint-100: 255 237 213;
+  --tint-200: 254 215 170;
+  --tint-300: 253 186 116;
+  --ring: 249 115 22;
+  --cta-from: #f97316;
+  --cta-to: #ea580c;
 }
 
 html {
@@ -42,7 +67,7 @@ body {
     @apply rounded-2xl bg-white shadow-card;
   }
   .input {
-    @apply w-full rounded-xl border border-pink-200 bg-white px-4 py-3 text-base outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20;
+    @apply w-full rounded-xl border border-tint-200 bg-white px-4 py-3 text-base outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20;
   }
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2 font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60;
@@ -67,12 +92,15 @@ body {
 }
 
 @keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(216, 27, 96, 0.55); }
-  70% { box-shadow: 0 0 0 16px rgba(216, 27, 96, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(216, 27, 96, 0); }
+  0% { box-shadow: 0 0 0 0 rgb(var(--ring) / 0.55); }
+  70% { box-shadow: 0 0 0 16px rgb(var(--ring) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--ring) / 0); }
 }
 .animate-pulse-ring {
   animation: pulse-ring 2s infinite;
+}
+.cta-grad {
+  background-image: linear-gradient(180deg, var(--cta-from), var(--cta-to));
 }
 
 @media print {

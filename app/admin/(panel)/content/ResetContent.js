@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { resetContentAction } from "../../actions";
 
-export default function ResetContent() {
+export default function ResetContent({ page }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   return (
@@ -13,8 +13,8 @@ export default function ResetContent() {
       className="adm-btn ghost"
       disabled={pending}
       onClick={() =>
-        confirm("সব লেখা আগের (ডিফল্ট) অবস্থায় ফেরত যাবে। নিশ্চিত?") &&
-        startTransition(async () => { await resetContentAction(); router.refresh(); })
+        confirm("এই পেজের সব লেখা আগের (ডিফল্ট) অবস্থায় ফেরত যাবে। নিশ্চিত?") &&
+        startTransition(async () => { await resetContentAction(page); router.refresh(); })
       }
     >
       ↺ সব আগের মতো করুন

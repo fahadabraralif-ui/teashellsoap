@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProducts } from "@/lib/store";
+import { PAGES } from "@/lib/content";
 import { saveProduct } from "../../../actions";
 import SaveForm from "../../SaveForm";
 import ImageInput from "../../ImageInput";
@@ -10,7 +11,7 @@ export default async function ProductEdit({ params }) {
   const { id } = await params;
   const isNew = id === "new";
   const p = isNew
-    ? { id: "", name: "", price: "", old_price: "", stock: 100, image: "/images/hero.png", sort: 0, active: true, boxes: 1 }
+    ? { id: "", name: "", price: "", old_price: "", stock: 100, image: "/images/hero.png", sort: 0, active: true, boxes: 1, page: "" }
     : (await getProducts({ all: true })).find((x) => x.id === Number(id));
   if (!p) notFound();
 
@@ -51,6 +52,14 @@ export default async function ProductEdit({ params }) {
           <label>
             এই প্যাকেজে কয়টি বক্স (ফ্রি ডেলিভারি হিসাবের জন্য — “2 box” প্যাকেজ হলে ২)
             <input name="boxes" type="number" min="1" defaultValue={p.boxes || 1} />
+          </label>
+          <label>
+            কোন ল্যান্ডিং পেজে দেখাবে
+            <select name="page" defaultValue={p.page || ""}>
+              {Object.values(PAGES).map((pg) => (
+                <option key={pg.slug} value={pg.slug}>{pg.label} — {pg.path}</option>
+              ))}
+            </select>
           </label>
           <div className="adm-field">
             <span>পণ্যের ছবি</span>

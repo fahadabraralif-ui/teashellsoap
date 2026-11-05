@@ -15,7 +15,7 @@ type Content = { text: Record<string, string>; lists: Record<"features" | "why" 
 
 // Admin > ল্যান্ডিং পেজ টেক্সট er lekha + {price} er moto token boshano
 async function loadPage() {
-  const [s, rows] = await Promise.all([getSettings(), getProducts()]);
+  const [s, rows] = await Promise.all([getSettings(), getProducts({ page: "" })]);
   const products = rows as unknown as Product[];
   const delivery = deliveryOptions(s);
   const main = products[0] || { price: site.price, old_price: site.oldPrice, image: site.gallery[0] };

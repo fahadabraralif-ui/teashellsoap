@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { bn } from "@/data/site";
 
 export type FormProduct = { id: number; name: string; price: number; image: string; boxes: number };
@@ -24,12 +24,12 @@ function fbIds() {
 
 function Stepper({ value, onChange }: { value: number; onChange: (diff: number) => void }) {
   return (
-    <div className="inline-flex items-center overflow-hidden rounded-lg border border-pink-300 bg-white" onClick={(e) => e.stopPropagation()}>
-      <button type="button" aria-label="কমান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-pink-50" onClick={() => onChange(-1)}>
+    <div className="inline-flex items-center overflow-hidden rounded-lg border border-tint-300 bg-white" onClick={(e) => e.stopPropagation()}>
+      <button type="button" aria-label="কমান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-tint-50" onClick={() => onChange(-1)}>
         −
       </button>
       <span className="w-8 text-center font-bold">{bn(value)}</span>
-      <button type="button" aria-label="বাড়ান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-pink-50" onClick={() => onChange(1)}>
+      <button type="button" aria-label="বাড়ান" className="px-3 py-1 text-lg font-bold text-brand hover:bg-tint-50" onClick={() => onChange(1)}>
         +
       </button>
     </div>
@@ -64,6 +64,16 @@ export default function OrderForm({
   const formRef = useRef<HTMLFormElement>(null);
   const savedDraft = useRef("");
   const checkoutSent = useRef(false);
+
+  // Page er "এই প্যাকেজে অর্ডার করুন" bottom (PackageButton) ei form e oi package bechhe dey
+  useEffect(() => {
+    const onSelect = (e: Event) => {
+      const id = Number((e as CustomEvent).detail);
+      if (products.some((p) => p.id === id)) setPkg(id);
+    };
+    window.addEventListener("select-package", onSelect);
+    return () => window.removeEventListener("select-package", onSelect);
+  }, [products]);
 
   const selected = products.find((p) => p.id === pkg) || products[0];
   // Mot box (package er box × quantity) freeBoxes chhuley delivery free — server o eki niyome hishab kore
@@ -153,7 +163,7 @@ export default function OrderForm({
         <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-green-100 text-4xl text-green-600">✓</div>
         <h3 className="mt-4 font-display text-2xl font-bold text-brand">{text.success_title}</h3>
         <p className="mt-2 text-slate-700">{text.success_text}</p>
-        <p className="mt-4 rounded-xl bg-pink-50 py-3 text-lg font-bold">সর্বমোট: {taka(total)}</p>
+        <p className="mt-4 rounded-xl bg-tint-50 py-3 text-lg font-bold">সর্বমোট: {taka(total)}</p>
       </div>
     );
   }
@@ -164,7 +174,7 @@ export default function OrderForm({
       onSubmit={onSubmit}
       onBlur={saveDraft}
       onFocus={onStartCheckout}
-      className="scroll-mt-4 rounded-3xl border-2 border-pink-200 bg-white/90 p-3 shadow-card backdrop-blur md:p-6"
+      className="scroll-mt-4 rounded-3xl border-2 border-tint-200 bg-white/90 p-3 shadow-card backdrop-blur md:p-6"
     >
       {/* Bot dhorar fad: manush eta dekhe na, bot puron kore */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] h-0 w-0 opacity-0" aria-hidden="true" />
@@ -188,13 +198,13 @@ export default function OrderForm({
                 }
               }}
               className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition ${
-                active ? "border-brand bg-pink-50 shadow-sm" : "border-pink-100 bg-white hover:border-pink-300"
+                active ? "border-brand bg-tint-50 shadow-sm" : "border-tint-100 bg-white hover:border-tint-300"
               }`}
             >
               <Radio checked={active} />
               {p.image && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.image} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-pink-50 object-cover md:h-[72px] md:w-[72px]" />
+                <img src={p.image} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-tint-50 object-cover md:h-[72px] md:w-[72px]" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="font-semibold leading-snug">{p.name}</p>
@@ -248,7 +258,7 @@ export default function OrderForm({
               <label
                 key={d.id}
                 className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition ${
-                  area === d.id ? "border-brand bg-pink-50" : "border-pink-100 bg-white hover:border-pink-300"
+                  area === d.id ? "border-brand bg-tint-50" : "border-tint-100 bg-white hover:border-tint-300"
                 }`}
               >
                 <input type="radio" name="area" checked={area === d.id} onChange={() => setArea(d.id)} className="sr-only" />
@@ -270,27 +280,27 @@ export default function OrderForm({
         </div>
 
         {/* ───── order summary ───── */}
-        <div className="h-fit rounded-2xl border border-pink-200 bg-pink-50/60 p-4 md:p-6">
+        <div className="h-fit rounded-2xl border border-tint-200 bg-tint-50/60 p-4 md:p-6">
           <h3 className="mb-4 text-xl font-bold">{text.summary_title}</h3>
           <table className="w-full text-[15px]">
             <thead>
-              <tr className="border-b border-pink-200 text-left">
+              <tr className="border-b border-tint-200 text-left">
                 <th className="pb-2 font-bold">প্রোডাক্ট</th>
                 <th className="pb-2 text-right font-bold">মূল্য</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-pink-200">
+              <tr className="border-b border-tint-200">
                 <td className="py-3 pr-2">
                   {selected.name} <b>× {bn(qty[selected.id])}</b>
                 </td>
                 <td className="py-3 text-right">{taka(subtotal)}</td>
               </tr>
-              <tr className="border-b border-pink-200">
+              <tr className="border-b border-tint-200">
                 <td className="py-3">সাবটোটাল</td>
                 <td className="py-3 text-right">{taka(subtotal)}</td>
               </tr>
-              <tr className="border-b border-pink-200">
+              <tr className="border-b border-tint-200">
                 <td className="py-3">ডেলিভারি চার্জ</td>
                 <td className="py-3 text-right">{freeShip ? <span className="font-semibold text-green-600">ফ্রি 🎉</span> : taka(charge)}</td>
               </tr>
@@ -302,7 +312,7 @@ export default function OrderForm({
           </table>
 
           <div className="mt-5 rounded-xl bg-white p-2">
-            <div className="flex items-center gap-3 rounded-lg border-2 border-brand bg-pink-50 px-3 py-2.5 font-semibold">
+            <div className="flex items-center gap-3 rounded-lg border-2 border-brand bg-tint-50 px-3 py-2.5 font-semibold">
               <Radio checked />
               {text.cod_label}
             </div>
@@ -316,7 +326,7 @@ export default function OrderForm({
           <button
             type="submit"
             disabled={status === "loading"}
-            className="animate-pulse-ring mt-4 w-full rounded-full bg-gradient-to-b from-[#e91e63] to-[#a3104d] py-4 font-display text-2xl font-bold text-white shadow-lg transition hover:brightness-110 disabled:animate-none disabled:opacity-60"
+            className="animate-pulse-ring mt-4 w-full rounded-full cta-grad py-4 font-display text-2xl font-bold text-white shadow-lg transition hover:brightness-110 disabled:animate-none disabled:opacity-60"
           >
             {status === "loading" ? "অপেক্ষা করুন..." : `${text.submit_btn} ${taka(total)}`}
           </button>

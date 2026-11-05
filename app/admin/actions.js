@@ -15,6 +15,7 @@ import { capiTokens } from "@/lib/fbcapi";
 import { checkPhone } from "@/lib/bdcourier";
 import { maybeAutoSync } from "@/lib/courierSync";
 import { afterStatusChange } from "@/lib/orderHooks";
+import { PAGES, pageBySlug } from "@/lib/content";
 import { notifyNewOrder, syncOrder, statusChangeText, markDeleted, sendToAll, removeChat, tg } from "@/lib/telegram";
 
 const refreshAdmin = () => revalidatePath("/admin", "layout");
@@ -154,6 +155,7 @@ export async function saveProduct(_prev, formData) {
   const boxes = Math.max(1, Math.round(Number(formData.get("boxes")) || 1));
   const image = String(formData.get("image") || "").trim();
   const active = formData.get("active") === "on";
+  const page = pageBySlug(String(formData.get("page") || "")).slug;
 
   if (!name || !(price > 0)) return { error: "নাম আর সঠিক দাম দিন" };
 
@@ -162,12 +164,12 @@ export async function saveProduct(_prev, formData) {
     if (old && old.image !== image) await deleteImages([old.image]);
     await sql`
       UPDATE products SET name = ${name}, price = ${price}, old_price = ${oldPrice}, stock = ${stock},
-        image = ${image}, sort = ${sort}, active = ${active}, boxes = ${boxes}
+        image = ${image}, sort = ${sort}, active = ${active}, boxes = ${boxes}, page = ${page}
       WHERE id = ${id}`;
   } else {
     await sql`
-      INSERT INTO products (name, price, old_price, stock, image, sort, active, boxes)
-      VALUES (${name}, ${price}, ${oldPrice}, ${stock}, ${image}, ${sort}, ${active}, ${boxes})`;
+      INSERT INTO products (name, price, old_price, stock, image, sort, active, boxes, page)
+      VALUES (${name}, ${price}, ${oldPrice}, ${stock}, ${image}, ${sort}, ${active}, ${boxes}, ${page})`;
   }
   refreshAll();
   redirect("/admin/products");
@@ -520,9 +522,10 @@ export async function createManualOrder(_prev, formData) {
 // Form er "t.<key>" = ekta lekha, "l.<list>.<i>.<field>" = list er item. Je section save hoy shudhu oita bodlay.
 export async function saveContentAction(_prev, formData) {
   await requireAdmin();
+  const page = PAGES[formData.get("page")] || PAGES.home;
   const s = await getSettings();
   let saved = {};
-  try { saved = JSON.parse(s.content || "{}") || {}; } catch {}
+  try { saved = JSON.parse(s[page.key] || "{}") || {}; } catch {}
   const text = { ...(saved.text || {}) };
   const lists = { ...(saved.lists || {}) };
   const posted = {};
@@ -545,13 +548,14 @@ export async function saveContentAction(_prev, formData) {
   // Notun chobi dile ba muchle purono ta storage theke o muche
   const keep = new Set(Object.keys(posted).flatMap((list) => images(lists[list])));
   await deleteImages(oldImages.filter((u) => !keep.has(u)));
-  await saveSettings({ content: JSON.stringify({ text, lists }) });
+  await saveSettings({ [page.key]: JSON.stringify({ text, lists }) });
   refreshAll();
   return { ok: true, at: Date.now() };
 }
 
-export async function resetContentAction() {
+export async function resetContentAction(pageId) {
   await requireAdmin();
-  await saveSettings({ content: "" });
+  const page = PAGES[pageId] || PAGES.home;
+  await saveSettings({ [page.key]: "" });
   refreshAll();
 }

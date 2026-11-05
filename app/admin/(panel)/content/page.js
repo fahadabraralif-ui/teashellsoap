@@ -1,5 +1,6 @@
 import { getSettings } from "@/lib/store";
-import { SECTIONS, getContent } from "@/lib/content";
+import Link from "next/link";
+import { PAGES, getContent } from "@/lib/content";
 import { saveContentAction } from "../../actions";
 import SaveForm from "../SaveForm";
 import ImageInput from "../ImageInput";
@@ -38,15 +39,25 @@ function ListFields({ list, items }) {
   );
 }
 
-export default async function ContentPage() {
+export default async function ContentPage({ searchParams }) {
+  const { page: pageParam } = await searchParams;
+  const pageId = PAGES[pageParam] ? pageParam : "home";
+  const page = PAGES[pageId];
   const s = await getSettings();
-  const { text, lists } = getContent(s);
+  const { text, lists } = getContent(s, pageId);
 
   return (
     <>
       <div className="adm-title-row">
         <h1 className="adm-title">ল্যান্ডিং পেজ টেক্সট</h1>
-        <ResetContent />
+        <ResetContent page={pageId} />
+      </div>
+      {/* Kon landing page er lekha edit hobe */}
+      <div className="range-tabs content-pages">
+        {Object.entries(PAGES).map(([id, p]) => (
+          <Link key={id} href={`/admin/content?page=${id}`} className={id === pageId ? "active" : ""}>{p.label}</Link>
+        ))}
+        <a href={page.path} target="_blank" rel="noopener noreferrer">↗ পেজ দেখুন ({page.path})</a>
       </div>
       <div className="adm-box content-help">
         <b>✍️ কীভাবে লিখবেন</b>
@@ -61,12 +72,18 @@ export default async function ContentPage() {
         </ul>
       </div>
 
-      {SECTIONS.map((sec) => (
-        <details key={sec.id} className="adm-box content-sec" open={sec.id === "hero"}>
+      {page.sections.map((sec) => (
+        <details key={`${pageId}-${sec.id}`} className="adm-box content-sec" open={sec.id === "hero"}>
           <summary><h3>{sec.title}</h3></summary>
           <SaveForm action={saveContentAction}>
+            <input type="hidden" name="page" value={pageId} />
             <div className="content-grid">
-              {sec.fields.map(([k, label, , long]) => (
+              {sec.fields.map(([k, label, , long]) => long === "image" ? (
+                <div key={k} className="content-img wide">
+                  {label}
+                  <ImageInput name={`t.${k}`} defaultValue={text[k] || ""} folder="products" />
+                </div>
+              ) : (
                 <label key={k} className={long ? "wide" : ""}>
                   {label}
                   {long ? (
