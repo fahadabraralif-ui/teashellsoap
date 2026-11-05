@@ -50,7 +50,6 @@ const boxesText = (tpl: string, boxes: number) => String(tpl || "").replace(/\{b
 export default function GlutaLanding(props: GlutaProps) {
   const { t, lists, products, delivery, freeBoxes, heroImage, brand, phone, whatsapp } = props;
   const formText = Object.fromEntries(FORM_KEYS.map((k) => [k, t[k]]));
-  const notes = [t.hero_note1, t.hero_note2, t.hero_note3].filter(Boolean);
   const brandName = t.header_brand || brand;
 
   return (
@@ -73,43 +72,27 @@ export default function GlutaLanding(props: GlutaProps) {
 
       {/* ───────── HERO ───────── */}
       <section className="bg-gradient-to-br from-[#fbf6e6] to-[#f8f3df]">
-        <div className={`mx-auto grid max-w-6xl items-center gap-10 px-4 py-10 md:gap-14 md:py-24 ${heroImage ? "md:grid-cols-[1.15fr_1fr]" : ""}`}>
-          <div className={heroImage ? "" : "mx-auto max-w-2xl text-center"}>
+        <div className={`mx-auto grid max-w-6xl items-center gap-8 px-5 pb-12 pt-8 md:gap-14 md:px-4 md:py-24 ${heroImage ? "md:grid-cols-[1.15fr_1fr]" : ""}`}>
+          {/* Mobile e shob majhkhane, desktop e bame */}
+          <div className={`text-center ${heroImage ? "md:text-left" : "mx-auto max-w-2xl"}`}>
             {t.hero_chip && (
-              <span className="inline-block rounded-full bg-[#e3efdc] px-4 py-1.5 text-xs font-bold tracking-wide text-[#1e5631] md:text-sm">
+              <span className="inline-block rounded-full bg-[#e3efdc] px-4 py-1.5 text-[11px] font-bold tracking-wide text-[#1e5631] min-[400px]:text-xs md:text-sm">
                 {t.hero_chip}
               </span>
             )}
-            <h1 className="mt-4 whitespace-pre-line font-display text-[2.7rem] font-extrabold leading-[1.1] text-[#e8541a] md:text-[3.9rem]">
+            <h1 className="mt-4 whitespace-pre-line font-display text-[2.5rem] font-extrabold leading-[1.1] text-[#e8541a] min-[400px]:text-[2.8rem] md:text-[3.9rem]">
               {t.hero_title}
             </h1>
-            {t.hero_tagline && <p className={`mt-3 text-xl font-bold md:text-[1.75rem] ${GREEN}`}>{t.hero_tagline}</p>}
-            {t.hero_sub && <p className="mt-3 leading-relaxed text-slate-600 md:text-lg">{t.hero_sub}</p>}
+            {t.hero_tagline && <p className={`mt-3 text-[1.3rem] font-bold leading-snug md:text-[1.75rem] ${GREEN}`}>{t.hero_tagline}</p>}
+            {t.hero_sub && <p className="mx-auto mt-3 max-w-md leading-relaxed text-slate-600 md:mx-0 md:max-w-none md:text-lg">{t.hero_sub}</p>}
 
-            <div className={`mt-7 flex flex-wrap gap-3 ${heroImage ? "" : "justify-center"}`}>
-              <a href="#order" className={`${ORANGE_BTN} rounded-xl px-6 py-3 text-lg md:px-7 md:py-4`}>
-                {t.cta_btn}
-              </a>
-              {t.more_btn && (
-                <a
-                  href="#details"
-                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 text-lg md:px-7 md:py-4 font-bold text-[#1e5631] transition hover:border-[#1e5631]/50"
-                >
-                  {t.more_btn}
-                </a>
-              )}
-            </div>
-
-            {notes.length > 0 && (
-              <ul className={`mt-5 flex flex-wrap gap-2 ${heroImage ? "" : "justify-center"}`}>
-                {notes.map((n, i) => (
-                  <li key={i} className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 md:text-base">
-                    <Check className="h-3.5 w-3.5 text-[#1e5631]" />
-                    {n}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <a
+              href="#order"
+              className={`${ORANGE_BTN} mt-7 w-full gap-2 rounded-2xl px-6 py-4 text-xl sm:w-auto md:rounded-xl md:px-8 md:text-lg`}
+            >
+              {t.cta_btn}
+              <span aria-hidden>→</span>
+            </a>
           </div>
 
           {heroImage && (
@@ -117,7 +100,7 @@ export default function GlutaLanding(props: GlutaProps) {
             <img
               src={heroImage}
               alt={t.hero_title?.replace(/\n/g, " ") || brand}
-              className="w-full rounded-[1.75rem] bg-white object-cover shadow-[0_30px_60px_-25px_rgba(30,86,49,0.5)] md:ml-auto md:max-w-[36rem]"
+              className="mx-auto w-full max-w-md rounded-[1.75rem] bg-white object-cover shadow-[0_30px_60px_-25px_rgba(30,86,49,0.5)] ring-4 ring-white md:ml-auto md:mr-0 md:max-w-[36rem] md:ring-0"
             />
           )}
         </div>
