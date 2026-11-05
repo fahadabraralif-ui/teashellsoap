@@ -193,32 +193,35 @@ export default function GlutaLanding(props: GlutaProps) {
 
       {/* ───────── PACKAGES ───────── */}
       {products.length > 0 && (
-        <section className="bg-[#1d5c2e] px-4 py-12 md:py-16">
-          <div className="mx-auto max-w-3xl">
-            <Heading title={t.pkg_title} sub={t.pkg_sub} dark />
-            <div className={`mt-8 grid gap-5 ${products.length > 1 ? "sm:grid-cols-2" : "mx-auto max-w-sm"}`}>
+        <section className="bg-gradient-to-br from-[#14532d] via-[#155e33] to-[#134e2a] px-4 py-12 md:py-14">
+          <div className="mx-auto max-w-5xl">
+            <div className="text-center">
+              <h2 className="font-display text-[2rem] font-extrabold leading-tight text-white md:text-[3.2rem]">{t.pkg_title}</h2>
+              {t.pkg_sub && <p className="mt-1 text-lg text-white/90 md:text-xl">{t.pkg_sub}</p>}
+            </div>
+            <div className={`mt-9 grid gap-6 ${products.length > 1 ? "sm:grid-cols-2" : "mx-auto max-w-lg"}`}>
               {products.map((p, i) => {
                 // Shesh package ta highlight (beshi pcs = beshi shuvidha)
                 const featured = products.length > 1 && i === products.length - 1;
                 return (
                   <div
                     key={p.id}
-                    className={`rounded-2xl bg-white p-5 text-center shadow-xl ${featured ? "ring-4 ring-[#f5b041]" : ""}`}
+                    className={`rounded-[1.4rem] bg-white px-6 py-8 text-center md:px-9 ${featured ? "ring-[3px] ring-[#f5b02e]" : ""}`}
                   >
                     {t.pkg_chip && (
-                      <span className="inline-block rounded-full bg-[#fdebd3] px-3 py-0.5 text-xs font-bold text-[#b45309]">
+                      <span className="inline-block rounded-full bg-[#fdefd5] px-4 py-1 text-base font-bold text-[#a8560c]">
                         {boxesText(t.pkg_chip, p.boxes)}
                       </span>
                     )}
-                    <p className={`mt-3 text-lg font-bold ${GREEN}`}>{p.name}</p>
-                    <p className="mt-1 font-display text-4xl font-extrabold text-[#f26b1d]">৳{bn(p.price)}</p>
-                    {t.pkg_note && <p className="mt-1 text-sm text-slate-500">{boxesText(t.pkg_note, p.boxes)}</p>}
-                    <PackageButton id={p.id} text={t.pkg_btn} className={`${ORANGE_BTN} mt-5 w-full rounded-xl px-4 py-3`} />
+                    <p className={`mt-4 text-2xl font-bold md:text-[1.75rem] ${GREEN}`}>{p.name}</p>
+                    <p className="mt-2 font-display text-5xl font-extrabold text-[#f26b1d] md:text-[3.4rem]">৳{bn(p.price)}</p>
+                    {t.pkg_note && <p className="mt-1 text-xl text-slate-500">{boxesText(t.pkg_note, p.boxes)}</p>}
+                    <PackageButton id={p.id} text={t.pkg_btn} className={`${ORANGE_BTN} mt-6 w-full rounded-xl px-4 py-4 text-xl md:text-[1.4rem]`} />
                   </div>
                 );
               })}
             </div>
-            {t.pkg_footer && <p className="mt-6 text-center font-semibold text-white">{t.pkg_footer}</p>}
+            {t.pkg_footer && <p className="mt-7 text-center text-lg font-bold text-white md:text-xl">{t.pkg_footer}</p>}
           </div>
         </section>
       )}
