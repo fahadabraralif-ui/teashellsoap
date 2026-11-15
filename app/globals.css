@@ -17,6 +17,20 @@
   --cta-to: #a3104d;
 }
 
+/* /turmericoilcombo — gaRho golapi (Daily Glow) */
+.theme-rose {
+  --brand: 116 35 72;
+  --brand-dark: 155 49 94;
+  --brand-deep: 62 32 52;
+  --tint-50: 255 248 250;
+  --tint-100: 255 240 245;
+  --tint-200: 240 213 223;
+  --tint-300: 231 184 201;
+  --ring: 169 50 96;
+  --cta-from: #8a2a58;
+  --cta-to: #742348;
+}
+
 /* /doublegluta — sobuj + komla (form er bottom ar ghor komla) */
 .theme-gluta {
   --brand: 234 88 12;
