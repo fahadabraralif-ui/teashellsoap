@@ -14,8 +14,6 @@ export type TurmericProps = {
   price: number;
   phone: string;
   whatsapp: string;
-  /** DM Sans font er CSS variable class (page.tsx theke) */
-  fontClass: string;
 };
 
 const FORM_KEYS = [
@@ -23,7 +21,8 @@ const FORM_KEYS = [
   "free_hint", "free_done", "summary_title", "cod_label", "hadith", "privacy", "submit_btn", "success_title", "success_text",
 ];
 
-const DM = "font-[family-name:var(--font-dm)]";
+// DM Sans app/layout.tsx er Google Fonts link theke ashe
+const DM = "font-['DM_Sans',sans-serif]";
 const BTN =
   "inline-flex items-center justify-center gap-2 rounded-[13px] bg-[#742348] px-[26px] py-[15px] font-bold text-white shadow-[0_8px_24px_#882a5630] transition hover:-translate-y-0.5 hover:bg-[#9b315e]";
 const WRAP = "mx-auto w-[min(1120px,calc(100%-28px))] sm:w-[min(1120px,calc(100%-36px))]";
@@ -61,7 +60,7 @@ function Head({ tag, title, sub }: { tag?: string; title?: string; sub?: string 
 const PHOTO_BG = ["bg-[#fff1ec]", "bg-[#fef5fa]", "bg-[#fff5df]"];
 
 export default function TurmericLanding(props: TurmericProps) {
-  const { t, lists, products, delivery, freeBoxes, price, phone, whatsapp, fontClass } = props;
+  const { t, lists, products, delivery, freeBoxes, price, phone, whatsapp } = props;
   const formText = Object.fromEntries(FORM_KEYS.map((k) => [k, t[k]]));
   const taka = `৳${bn(price)}`;
   const brand = (
@@ -72,7 +71,7 @@ export default function TurmericLanding(props: TurmericProps) {
   );
 
   return (
-    <div className={`theme-rose ${fontClass} min-h-screen bg-[#fffdfc] leading-[1.65] text-[#352432]`}>
+    <div className={`theme-rose min-h-screen bg-[#fffdfc] leading-[1.65] text-[#352432]`}>
       {t.topbar && (
         <div className="bg-[#351d30] px-3 py-2 text-center text-[13px] text-white">
           <H text={t.topbar} cls="font-bold text-[#ffdb9b]" />

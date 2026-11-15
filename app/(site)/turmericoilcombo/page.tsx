@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
 import TurmericLanding from "@/components/turmeric/TurmericLanding";
 import Tracking from "@/components/Tracking";
 import { getSettings, getProducts, deliveryOptions } from "@/lib/store";
@@ -9,8 +8,6 @@ export const dynamic = "force-dynamic";
 
 // roseglowbd.xyz/turmericoilcombo — lekha: admin > ল্যান্ডিং পেজ টেক্সট > Turmeric Combo, পণ্য: admin > পণ্য (পেজ = Turmeric Combo)
 const PAGE = PAGES.turmericoilcombo;
-
-const dmSans = DM_Sans({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-dm", display: "swap" });
 
 type Product = { id: number; name: string; price: number; old_price: number; image: string; boxes: number };
 type Item = Record<string, string>;
@@ -54,6 +51,8 @@ export default async function TurmericComboPage() {
   const { s, products, delivery, price, freeBoxes, t, lists } = await loadPage();
   return (
     <>
+      {/* Logo-r DM Sans font — shudhu ei page e lage (React head e tule ney) */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700;800&display=swap" precedence="default" />
       <Tracking pixel={s.fb_pixel} gtm={s.gtm_id} />
       <TurmericLanding
         t={t}
@@ -64,7 +63,6 @@ export default async function TurmericComboPage() {
         price={price}
         phone={s.phone}
         whatsapp={s.whatsapp}
-        fontClass={dmSans.variable}
       />
     </>
   );
