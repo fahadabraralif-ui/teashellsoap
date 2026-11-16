@@ -31,6 +31,20 @@
   --cta-to: #742348;
 }
 
+/* /carrotturmericoil — komla + gaRho lal */
+.theme-carrot {
+  --brand: 179 54 26;
+  --brand-dark: 140 36 14;
+  --brand-deep: 107 22 8;
+  --tint-50: 255 250 243;
+  --tint-100: 255 243 226;
+  --tint-200: 254 226 192;
+  --tint-300: 247 201 127;
+  --ring: 242 107 15;
+  --cta-from: #ffb020;
+  --cta-to: #f26b0f;
+}
+
 /* /doublegluta — sobuj + komla (form er bottom ar ghor komla) */
 .theme-gluta {
   --brand: 234 88 12;
