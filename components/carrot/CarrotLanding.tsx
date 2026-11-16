@@ -85,12 +85,12 @@ export default function CarrotLanding(props: CarrotProps) {
         </div>
       )}
 
-      <header className="sticky top-0 z-20 border-b border-[#f6dfc9] bg-white/95 backdrop-blur">
-        <div className={`${WRAP} flex items-center justify-between gap-3 py-3`}>
-          <span className="text-lg font-extrabold tracking-wide text-[#a3360c] sm:text-xl">{t.brand}</span>
-          {t.nav_text && <span className="hidden text-sm text-[#8a6553] md:block">{t.nav_text}</span>}
+      <header className="sticky top-0 z-20 border-b border-[#f6dfc9] bg-[#fffaf3]/95 backdrop-blur">
+        <div className={`${WRAP} flex items-center justify-between gap-3 py-3 md:py-4`}>
+          <span className="text-lg font-extrabold uppercase tracking-wide text-[#a3360c] sm:text-xl md:text-[22px]">{t.brand}</span>
+          {t.nav_text && <span className="hidden text-[15px] text-[#7a5a4a] md:block">{t.nav_text}</span>}
           {t.nav_btn && (
-            <a href="#order" className={`${BTN} !px-5 !py-2 text-sm`}>
+            <a href="#order" className={`${BTN} !px-5 !py-2 text-sm md:!px-7 md:!py-3 md:text-base`}>
               {t.nav_btn}
             </a>
           )}
@@ -99,40 +99,44 @@ export default function CarrotLanding(props: CarrotProps) {
 
       <main>
         {/* ───────── HERO ───────── */}
-        <section className="bg-[radial-gradient(circle_at_85%_15%,#ffe2b8_0,transparent_45%),linear-gradient(160deg,#fff6ea,#fff0e2)]">
-          <div className={`${WRAP} grid items-center gap-8 py-9 md:grid-cols-2 md:py-14`}>
+        <section className="bg-[radial-gradient(circle_at_85%_10%,#ffe9c7_0,transparent_45%),linear-gradient(160deg,#fffaf3,#fff3e4)]">
+          <div className={`${WRAP} grid items-center gap-8 py-9 md:grid-cols-[1.05fr_1fr] md:gap-12 md:py-16`}>
             <div className="order-2 text-center md:order-1 md:text-left">
               {t.eyebrow && (
-                <span className="inline-block rounded-full border border-[#f7c97f] bg-[#fff3d4] px-3.5 py-1 text-[13px] font-bold text-[#a3360c]">
+                <span className="inline-block rounded-full border border-[#f7d79a] bg-[#fff1cf] px-4 py-1.5 text-sm font-bold text-[#a3360c] md:px-5 md:text-base">
                   {t.eyebrow}
                 </span>
               )}
-              <h1 className="mb-4 mt-4 whitespace-pre-line text-[38px] font-extrabold leading-[1.2] text-[#6b1608] md:text-[clamp(40px,4.8vw,56px)]">
+              <h1 className="mb-5 mt-5 whitespace-pre-line text-[40px] font-extrabold leading-[1.18] text-[#6b1608] md:text-[clamp(44px,5.4vw,66px)]">
                 <H text={t.hero_title} cls="text-[#f26b0f]" />
               </h1>
-              {t.hero_sub && <p className="mx-auto mb-5 max-w-[520px] text-[15px] text-[#6e4a38] md:mx-0 md:text-base">{t.hero_sub}</p>}
+              {t.hero_sub && (
+                <p className="mx-auto mb-6 max-w-[560px] text-base leading-[1.8] text-[#6e4a38] md:mx-0 md:text-lg">{t.hero_sub}</p>
+              )}
               {price > 0 && (
-                <div className="mb-6 flex flex-wrap items-center justify-center gap-3 md:justify-start">
-                  <span className="text-[40px] font-extrabold leading-none text-[#6b1608]">{taka}</span>
+                <div className="mb-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 md:justify-start">
+                  <span className="text-[44px] font-extrabold leading-none text-[#6b1608] md:text-[54px]">{taka}</span>
                   {t.old_label && oldPrice > price && (
-                    <span className="text-sm text-[#9a7a6a]">
-                      {t.old_label} <s>৳{bn(oldPrice)}</s>
+                    <span className="text-base text-[#9a7a6a] line-through">
+                      {t.old_label}: ৳{bn(oldPrice)}
                     </span>
                   )}
                   {t.price_tag && (
-                    <span className="rounded-md bg-[#b3200f] px-2.5 py-1 text-[13px] font-bold text-white">{t.price_tag}</span>
+                    <span className="rounded-lg bg-[#9e1d0d] px-4 py-1.5 text-base font-bold text-white shadow-[0_6px_16px_rgba(158,29,13,.25)] md:text-lg">
+                      {t.price_tag}
+                    </span>
                   )}
                 </div>
               )}
               {t.hero_btn && (
-                <a href="#order" className={`${BTN} px-8 py-3.5 text-base`}>
+                <a href="#order" className={`${BTN} !px-9 !py-4 text-lg`}>
                   {t.hero_btn}
                 </a>
               )}
               {chips.length > 0 && (
-                <div className="mt-5 flex flex-wrap justify-center gap-2 md:justify-start">
+                <div className="mt-6 flex flex-wrap justify-center gap-2.5 md:justify-start">
                   {chips.map((c, i) => (
-                    <span key={i} className="rounded-full border border-[#f2d6bd] bg-white px-3 py-1 text-xs text-[#6e4a38]">
+                    <span key={i} className="rounded-full border border-[#f2dcc6] bg-white px-4 py-1.5 text-sm text-[#5e3d2e] md:text-[15px]">
                       {c}
                     </span>
                   ))}
@@ -145,7 +149,7 @@ export default function CarrotLanding(props: CarrotProps) {
                 <img
                   src={t.hero_img}
                   alt={String(t.hero_title || "").replace(/[[\]]/g, "")}
-                  className="mx-auto w-full max-w-[460px] rounded-[22px] shadow-[0_20px_50px_rgba(160,60,10,.2)]"
+                  className="mx-auto w-full max-w-[520px] rounded-[24px] shadow-[0_24px_60px_rgba(160,60,10,.22)] md:max-w-none"
                 />
               </div>
             )}
