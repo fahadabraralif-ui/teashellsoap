@@ -1,6 +1,7 @@
 import { bn } from "@/data/site";
 import OrderForm, { type FormProduct } from "../landing/OrderForm";
 import FloatingActions from "../landing/FloatingActions";
+import CarrotCountdown from "./CarrotCountdown";
 
 type Item = Record<string, string>;
 
@@ -155,6 +156,9 @@ export default function CarrotLanding(props: CarrotProps) {
             )}
           </div>
         </section>
+
+        {/* ───────── COUNTDOWN (protidin rat 12 tay notun kore 24 ghonta) ───────── */}
+        {t.timer_text && <CarrotCountdown label={t.timer_text} />}
 
         {/* ───────── WHAT'S INSIDE ───────── */}
         {t.inside_title && lists.inside.length > 0 && (
